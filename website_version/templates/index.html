@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Centipede Game</title>
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #121212;
+            color: #f5f5f5;
+            text-align: center;
+            margin-top: 50px;
+        }
+
+        #status {
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            color: #ffcc00;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            margin: 10px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .btn:disabled {
+            background-color: #555;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        .btn-take {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        .btn-pass {
+            background-color: #3498db;
+            color: white;
+        }
+
+        #log {
+            margin-top: 30px;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Centipede Game</h1>
+    <div id="status">Connecting...</div>
+    <div id="score">score</div>
+
+    <button id="takeBtn" class="btn btn-take" disabled>Take</button>
+    <button id="passBtn" class="btn btn-pass" disabled>Pass</button>
+
+    <div id="log">Game log will appear here.</div>
+
+    <script>
+  const socket = io();
+  const takeBtn = document.getElementById("takeBtn");
+  const passBtn = document.getElementById("passBtn");
+  const messageDiv = document.getElementById("status");
+
+  function setButtonsEnabled(enabled) {
+    takeBtn.disabled = !enabled;
+    passBtn.disabled = !enabled;
+    takeBtn.classList.toggle('enabled', enabled);
+    passBtn.classList.toggle('enabled', enabled);
+  }
+
+  socket.on('connect', () => {
+    socket.emit('join');
+    setButtonsEnabled(false); // Default to disabled
+  });
+
+  socket.on('message', data => {
+    console.log(data.msg);
+    messageDiv.textContent = data.msg;
+
+    // Enable buttons only if it's this player's turn
+    if (data.msg.includes("Your turn")) {
+      setButtonsEnabled(true);
+      console.log(true);
+    } else {
+      setButtonsEnabled(false);
+      console.log(false);
+    }
+  });
+
+  takeBtn.onclick = () => {
+    socket.emit('move', { move: 'take' });
+    setButtonsEnabled(false); // prevent double-clicking
+  };
+
+  passBtn.onclick = () => {
+    socket.emit('move', { move: 'pass' });
+    setButtonsEnabled(false);
+  };
+
+  socket.on('update', data => {
+    document.getElementById("log").textContent = data.log;
+    document.getElementById("score").textContent = `P1: ${data.score[0]} | P2: ${data.score[1]}`;
+  });
+</script>
+
+
+</body>
+</html>

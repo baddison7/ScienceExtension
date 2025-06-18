@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Commander Panel</title>
+    <script src="https://cdn.socket.io/4.3.2/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Commander Panel</h1>
+    <p>Connected Players:</p>
+    <ul id="players"></ul>
+
+    <button onclick="startGame()">Start Game</button>
+
+    <script>
+        const socket = io();
+
+        socket.on('connect', () => {
+            socket.emit('commander_join');
+        });
+
+        socket.on('update_players', (data) => {
+            const playersList = document.getElementById('players');
+            playersList.innerHTML = '';
+            data.players.forEach(p => {
+                const li = document.createElement('li');
+                li.textContent = p;
+                playersList.appendChild(li);
+            });
+        });
+
+        function startGame() {
+            socket.emit('commander_start');
+        }
+    </script>
+</body>
+</html>
