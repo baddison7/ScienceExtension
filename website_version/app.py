@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room
-import random, os, datetime
+import random, os, datetime, time
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -144,8 +144,6 @@ def handle_move(data):
 
     if move_symbol == 'x':
         save_game_log(updated_log, sid, opponent_sid, score)
-        emit('message', {'msg': 'Game Over'}, room=sid)
-        emit('message', {'msg': 'Game Over'}, room=opponent_sid)
         players[sid]['turn'] = False
         players[opponent_sid]['turn'] = False
     else:

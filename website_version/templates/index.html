@@ -67,6 +67,8 @@
   const takeBtn = document.getElementById("takeBtn");
   const passBtn = document.getElementById("passBtn");
   const messageDiv = document.getElementById("status");
+  const logDiv = document.getElementById("log");
+  const scoreDiv = document.getElementById("score");
 
   function setButtonsEnabled(enabled) {
     takeBtn.disabled = !enabled;
@@ -81,16 +83,17 @@
   });
 
   socket.on('message', data => {
-    console.log(data.msg);
     messageDiv.textContent = data.msg;
 
-    // Enable buttons only if it's this player's turn
-    if (data.msg.includes("Your turn")) {
+    if (data.msg.includes("Game Over")) {
+      console.log("Game over received");
+      setButtonsEnabled(false); // Disable buttons when game is over
+      logDiv.textContent = "Game Over"
+      scoreDiv.textContent = "Game Over";
+    } else if (data.msg.includes("Your turn")) {
       setButtonsEnabled(true);
-      console.log(true);
     } else {
       setButtonsEnabled(false);
-      console.log(false);
     }
   });
 
@@ -105,8 +108,8 @@
   };
 
   socket.on('update', data => {
-    document.getElementById("log").textContent = data.log;
-    document.getElementById("score").textContent = `P1: ${data.score[0]} | P2: ${data.score[1]}`;
+    logDiv.textContent = data.log;
+    scoreDiv.textContent = `P1: ${data.score[0]} | P2: ${data.score[1]}`;
   });
 </script>
 
