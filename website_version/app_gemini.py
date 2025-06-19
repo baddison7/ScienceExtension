@@ -10,6 +10,8 @@ log_dir = "logs"
 os.makedirs(log_dir, exist_ok=True)
 session_log_filename = f"session_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 session_log_path = os.path.join(log_dir, session_log_filename)
+name_log_filename = f"name_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+name_log_path = os.path.join(log_dir, name_log_filename)
 
 # Data structures
 players = {}  # sid -> {'game_log': str, 'opponent': sid, 'turn': bool, 'ready_for_next_game': bool}
@@ -45,7 +47,7 @@ def save_game_log(game_log, sid1, sid2, final_score):
         f.write(f"Final Score: P1={final_score[0]}, P2={final_score[1]}\n")
         f.write("=== Game End ===\n\n")
 
-def round_robin(players_list): # Renamed 'players' to 'players_list' to avoid confusion with the global dict
+def round_robin(players_list):
     players_copy = list(players_list)
     if len(players_copy) % 2 == 1:
         players_copy.append(None)  # Bye round for odd player
@@ -87,15 +89,17 @@ def commander_join():
     socketio.emit('update_players', {'players': [p[:4] for p in waiting_players]}, room='commander', namespace='/')
 
 @socketio.on('join')
-def handle_join():
+def handle_join(data):
     sid = request.sid
-    # Initialize 'ready_for_next_game' to False when a player joins
+    name = data.get('name', f'Player_{sid[:4]}')  # Default name if not provided
+    with open(name_log_path, 'a') as f:
+        f.write(f"{sid}: {name}\n")
+
     players[sid] = {'game_log': '', 'opponent': None, 'turn': False, 'ready_for_next_game': False}
     if sid not in waiting_players: # Prevent duplicate entries if player refreshes
         waiting_players.append(sid)
     socketio.emit('message', {'msg': 'Waiting for commander to start...'}, room=sid, namespace='/')
     socketio.emit('update_players', {'players': [p[:4] for p in waiting_players]}, room='commander', namespace='/')
-
 
 def start_game_tournament():
     global all_rounds_pairings, current_round_index, games_in_current_round

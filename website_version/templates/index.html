@@ -78,8 +78,13 @@
   }
 
   socket.on('connect', () => {
-    socket.emit('join');
-    setButtonsEnabled(false); // Default to disabled
+  let name = prompt("Enter your student number:");
+  while (name === null || name.trim() === "") {
+    name = prompt("Enter your student number:");
+  }
+
+  socket.emit('join', { name });
+  setButtonsEnabled(false);
   });
 
   socket.on('message', data => {
@@ -88,7 +93,7 @@
     if (data.msg.includes("Game Over")) {
       console.log("Game over received");
       setButtonsEnabled(false); // Disable buttons when game is over
-      logDiv.textContent = "Game Over"
+      // logDiv.textContent = "Game Over"
       scoreDiv.textContent = "Game Over";
     } else if (data.msg.includes("Your turn")) {
       setButtonsEnabled(true);
@@ -108,7 +113,7 @@
   };
 
   socket.on('update', data => {
-    logDiv.textContent = data.log;
+    // logDiv.textContent = data.log;
     scoreDiv.textContent = `P1: ${data.score[0]} | P2: ${data.score[1]}`;
   });
 </script>
