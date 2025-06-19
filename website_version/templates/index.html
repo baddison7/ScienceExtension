@@ -45,7 +45,7 @@
         }
 
         #log {
-            margin-top: 30px;
+            margin-bottom: 30px;
             font-size: 14px;
             white-space: pre-wrap;
         }
@@ -55,20 +55,21 @@
 
     <h1>Centipede Game</h1>
     <div id="status">Connecting...</div>
-    <div id="score">score</div>
+    <div id="yourPayoff">Your Expected Payoff: </div>
+    <div id="opponentPayoff">Opponent Expected Payoff: </div>
+    <div id="log">Game Log: </div>
 
     <button id="takeBtn" class="btn btn-take" disabled>Take</button>
     <button id="passBtn" class="btn btn-pass" disabled>Pass</button>
-
-    <div id="log">Game log will appear here.</div>
 
     <script>
   const socket = io();
   const takeBtn = document.getElementById("takeBtn");
   const passBtn = document.getElementById("passBtn");
-  const messageDiv = document.getElementById("status");
   const logDiv = document.getElementById("log");
-  const scoreDiv = document.getElementById("score");
+  const messageDiv = document.getElementById("status");
+  const yourPayoffDiv = document.getElementById("yourPayoff");
+  const opponentPayoffDiv = document.getElementById("opponentPayoff");
 
   function setButtonsEnabled(enabled) {
     takeBtn.disabled = !enabled;
@@ -90,16 +91,24 @@
   socket.on('message', data => {
     messageDiv.textContent = data.msg;
 
-    if (data.msg.includes("Game Over")) {
-      console.log("Game over received");
-      setButtonsEnabled(false); // Disable buttons when game is over
-      // logDiv.textContent = "Game Over"
-      scoreDiv.textContent = "Game Over";
-    } else if (data.msg.includes("Your turn")) {
+    if (data.msg.includes("Your turn")) {
       setButtonsEnabled(true);
     } else {
       setButtonsEnabled(false);
     }
+
+  });
+
+  socket.on('start', data => {
+    yourPayoffDiv.textContent = `Your Expected Payoff: ${data.your_score}`;
+    opponentPayoffDiv.textContent = `Opponent Expected Payoff: ${data.opponents_score}`;
+    console.log("Game started:", data);
+  });
+
+  socket.on('game_over', data => {
+    alert(`${data.msg}\nYour score: ${data.final_score[0]}\nOpponent score: ${data.final_score[1]}`);
+    setButtonsEnabled(false);
+
   });
 
   takeBtn.onclick = () => {
@@ -113,8 +122,9 @@
   };
 
   socket.on('update', data => {
-    // logDiv.textContent = data.log;
-    scoreDiv.textContent = `P1: ${data.score[0]} | P2: ${data.score[1]}`;
+    yourPayoffDiv.textContent = `Your Expected Payoff: ${data.your_score}`;
+    opponentPayoffDiv.textContent = `Opponent Expected Payoff: ${data.opponents_score}`;
+    logDiv.textContent + data.log;
   });
 </script>
 
