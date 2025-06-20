@@ -96,6 +96,12 @@
     } else {
       setButtonsEnabled(false);
     }
+    if (data.msg.includes("BYE")) {
+      setButtonsEnabled(false);
+      yourPayoffDiv.textContent = `Your Expected Payoff: `;
+      opponentPayoffDiv.textContent = `Opponent Expected Payoff: `;
+      logDiv.textContent = `Game Log: `;
+    }
 
   });
 
@@ -107,6 +113,10 @@
 
   socket.on('game_over', data => {
     alert(`${data.msg}\nYour score: ${data.your_score}\nOpponent score: ${data.opponents_score}`);
+    yourPayoffDiv.textContent = `Your Expected Payoff: `;
+    opponentPayoffDiv.textContent = `Opponent Expected Payoff: `;
+    logDiv.textContent = `Game Log: `;
+    console.log("Game over:");
     setButtonsEnabled(false);
 
   });

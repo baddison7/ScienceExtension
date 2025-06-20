@@ -12,6 +12,9 @@ session_log_filename = f"session_{datetime.datetime.now().strftime('%Y%m%d_%H%M%
 session_log_path = os.path.join(log_dir, session_log_filename)
 name_log_filename = f"name_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
 name_log_path = os.path.join(log_dir, name_log_filename)
+score_log_filename = f"totalscore_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+score_log_path = os.path.join(log_dir, score_log_filename)
+
 
 # Data structures
 players = {}  # sid -> {'game_log': str, 'opponent': sid, 'turn': bool, 'ready_for_next_game': bool}
@@ -21,6 +24,44 @@ all_rounds_pairings = [] # Stores all generated round-robin pairings
 games_in_current_round = {} # game_id -> {'p1_sid': sid, 'p2_sid': sid, 'completed': bool}
 
 # --- Helpers ---
+
+def update_total_score_log(sid, total_score):
+    if not os.path.exists(score_log_path):
+        with open(score_log_path, 'w') as f:
+            pass  # Just create the file if it doesn't exist
+
+    # Read all existing lines
+    with open(score_log_path, 'r') as f:
+        lines = f.readlines()
+
+    # Remove any previous entry for this sid
+    lines = [line for line in lines if not line.startswith(sid)]
+
+    # Add new score entry
+    lines.append(f"{sid}:{total_score}\n")
+
+    # Write back to file
+    with open(score_log_path, 'w') as f:
+        f.writelines(lines)
+def update_total_score_log(sid, total_score):
+    if not os.path.exists(score_log_path):
+        with open(score_log_path, 'w') as f:
+            pass  # Just create the file if it doesn't exist
+
+    # Read all existing lines
+    with open(score_log_path, 'r') as f:
+        lines = f.readlines()
+
+    # Remove any previous entry for this sid
+    lines = [line for line in lines if not line.startswith(sid)]
+
+    # Add new score entry
+    lines.append(f"{sid}:{total_score}\n")
+
+    # Write back to file
+    with open(score_log_path, 'w') as f:
+        f.writelines(lines)
+
 
 def linear_payoff(turn_number, p1_start=2, p2_start=1, increment=2):
     if turn_number < 1:
@@ -96,7 +137,7 @@ def handle_join(data):
     with open(name_log_path, 'a') as f:
         f.write(f"{sid}: {name}\n")
 
-    players[sid] = {'game_log': '', 'opponent': None, 'turn': False, 'ready_for_next_game': False}
+    players[sid] = {'game_log': '', 'opponent': None, 'turn': False, 'ready_for_next_game': False, 'total_score': 0,}
     if sid not in waiting_players: # Prevent duplicate entries if player refreshes
         waiting_players.append(sid)
     socketio.emit('message', {'msg': 'Waiting to start...'}, room=sid, namespace='/')
@@ -205,6 +246,9 @@ def handle_move(data):
     current_score = linear_payoff(turn_number)
     expected_score = linear_payoff(turn_number + 1)
     ui_log = updated_moves.replace('|', '')
+    ui_log = ui_log.replace('0', '🟩')
+    ui_log = ui_log.replace('2', '🟩')
+    ui_log = ui_log.replace('x', '🟥')
 
     # Score from each player's perspective
     def get_scores(player_sid, score_tuple):
@@ -224,6 +268,15 @@ def handle_move(data):
         players[sid]['ready_for_next_game'] = True
         players[opponent_sid]['ready_for_next_game'] = True
 
+        # Update total scores
+        players[sid]['total_score'] += your_current_score
+        players[opponent_sid]['total_score'] += your_opponent_current_score
+        update_total_score_log(sid, players[sid]['total_score'])
+        update_total_score_log(opponent_sid, players[opponent_sid]['total_score'])
+
+
+        print(f"{sid[:4]} total_score: {players[sid]['total_score']}")
+        print(f"{opponent_sid[:4]} total_score: {players[opponent_sid]['total_score']}")
         socketio.emit('game_over', {
             'msg': 'Game Over, you took the pot!',
             'winner': 'true',
