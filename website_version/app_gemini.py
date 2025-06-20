@@ -27,7 +27,6 @@ def linear_payoff(turn_number, p1_start=2, p2_start=1, increment=2):
         return p1_start, p2_start  # Fallback if something weird happens
     p1 = p1_start + ((turn_number - 1) // 2) * increment
     p2 = p2_start + ((turn_number) // 2) * increment
-    print(f"Calculated payoffs: P1={p1}, P2={p2} for turn {turn_number}")
     return p1, p2
 
 def exponential_payoff(turn_number, p1_base=2, p2_base=1, growth_rate=1.5):
@@ -45,12 +44,10 @@ def strip_game_log(game_log):
         return 0
 
 def save_game_log(game_log, sid1, sid2, final_score):
-    if ':' not in game_log:
-        return
     game_id, moves = game_log.split(':')
+    moves = moves.replace('|', '')  # Use comma for better readability in logs
     with open(session_log_path, 'a') as f:
-        f.write(f"{sid1},{sid2},{moves}\n")
-        f.write(f"Final Score: P1={final_score[0]}, P2={final_score[1]}\n")
+        f.write(f"{sid1}:{sid2}|{moves}\n")
 
 def round_robin(players_list):
     players_copy = list(players_list)
@@ -176,117 +173,100 @@ def play_next_round():
         socketio.sleep(1) # Small delay
         socketio.start_background_task(target=play_next_round)
 
-
-# def reset_tournament_state():
-#     global current_round_index, all_rounds_pairings, games_in_current_round, waiting_players
-#     current_round_index = -1
-#     all_rounds_pairings = []
-#     games_in_current_round = {}
-#     # Optionally clear waiting_players or mark all players as 'available'
-#     # For now, let's keep waiting_players as they are to allow re-joining
-#     for sid in players:
-#         players[sid] = {'game_log': '', 'opponent': None, 'turn': False, 'ready_for_next_game': False}
-#     socketio.emit('update_players', {'players': [p[:4] for p in waiting_players]}, room='commander', namespace='/')
-
-
 @socketio.on('move')
 def handle_move(data):
     sid = request.sid
     move = data['move']
     player_data = players.get(sid)
-    
+
     if not player_data:
-        print(f"Player not found.")
+        print("Player not found.")
         return
 
     opponent_sid = player_data.get('opponent')
     if not opponent_sid or opponent_sid not in players:
         socketio.emit('message', {'msg': 'No opponent found or opponent disconnected.'}, room=sid, namespace='/')
-        # Mark player as ready for next game if opponent is gone
         player_data['ready_for_next_game'] = True
-        # Mark this specific game as completed if it was part of games_in_current_round
         game_id_prefix = player_data['game_log'].split(':')[0]
         if game_id_prefix in games_in_current_round:
             games_in_current_round[game_id_prefix]['completed'] = True
-        check_round_completion() # Check if this makes the round complete
+        check_round_completion()
         return
 
     game_log = player_data['game_log']
-    move_symbol = 'x' if move == 'take' else ('2' if random.random() < 0.25 else '0')
     base, moves = game_log.split(':')
-    moves = moves + '|' + move_symbol if moves else move_symbol
-    updated_log = f"{base}:{moves}"
+    move_symbol = 'x' if move == 'take' else ('2' if random.random() < 0.25 else '0')
+    updated_moves = moves + '|' + move_symbol if moves else move_symbol
+    updated_log = f"{base}:{updated_moves}"
     players[sid]['game_log'] = updated_log
     players[opponent_sid]['game_log'] = updated_log
 
-    turn_number = strip_game_log(updated_log) + 1
-    print(f"turn number {turn_number}")
-    print(updated_log)
-    score = linear_payoff(turn_number)
-    
-    if players[sid]['player_num'] == 'p1':
-        your_score, opponent_score = score[0], score[1]
-    else:
-        your_score, opponent_score = score[1], score[0]
+    turn_number = strip_game_log(updated_log)
+    current_score = linear_payoff(turn_number)
+    expected_score = linear_payoff(turn_number + 1)
+    ui_log = updated_moves.replace('|', '')
 
-    if players[opponent_sid]['player_num'] == 'p1':
-        opponent_your_score, opponent_opponent_score = score[0], score[1]
-    else:
-        opponent_your_score, opponent_opponent_score = score[1], score[0]
+    # Score from each player's perspective
+    def get_scores(player_sid, score_tuple):
+        return (score_tuple[0], score_tuple[1]) if players[player_sid]['player_num'] == 'p1' else (score_tuple[1], score_tuple[0])
 
-    socketio.emit('update', {
-        'your_score': your_score,
-        'opponents_score': opponent_score,
-        'log': updated_log
-    }, room=sid, namespace='/')
+    your_current_score, your_opponent_current_score = get_scores(sid, current_score)
+    opp_current_score, opp_opponent_current_score = get_scores(opponent_sid, current_score)
 
-    socketio.emit('update', {
-        'your_score': opponent_your_score,
-        'opponents_score': opponent_opponent_score,
-        'log': updated_log
-    }, room=opponent_sid, namespace='/')
+    your_expected_score, your_opponent_expected_score = get_scores(sid, expected_score)
+    opp_expected_score, opp_opponent_expected_score = get_scores(opponent_sid, expected_score)
 
+    # If someone took the pot
     if move_symbol == 'x':
-        save_game_log(updated_log, sid, opponent_sid, score)
+        save_game_log(updated_log, sid, opponent_sid, current_score)
         players[sid]['turn'] = False
         players[opponent_sid]['turn'] = False
-        players[sid]['ready_for_next_game'] = True # Mark player as finished for this game
-        players[opponent_sid]['ready_for_next_game'] = True # Mark opponent as finished for this game
+        players[sid]['ready_for_next_game'] = True
+        players[opponent_sid]['ready_for_next_game'] = True
 
-        # Send tailored final scores
         socketio.emit('game_over', {
             'msg': 'Game Over, you took the pot!',
             'winner': 'true',
-            'final_score': [your_score, opponent_score],
+            'your_score': your_current_score,
+            'opponents_score': your_opponent_current_score,
             'final_log': updated_log
         }, room=sid, namespace='/')
 
         socketio.emit('game_over', {
             'msg': 'Game Over, your opponent took the pot!',
             'winner': 'false',
-            'final_score': [opponent_your_score, opponent_opponent_score],
+            'your_score': opp_current_score,
+            'opponents_score': opp_opponent_current_score,
             'final_log': updated_log
         }, room=opponent_sid, namespace='/')
 
-
-        # Still send a generic message for general notifications (e.g., "Waiting for next round...")
         socketio.emit('message', {'msg': 'Waiting for next round...'}, room=sid, namespace='/')
         socketio.emit('message', {'msg': 'Waiting for next round...'}, room=opponent_sid, namespace='/')
 
-        # Mark this specific game as completed
         game_id = base
         if game_id in games_in_current_round:
             games_in_current_round[game_id]['completed'] = True
-
-        # Check if the entire round is completed
         check_round_completion()
 
     else:
-        # Toggle turns
+        # Normal move: update and switch turn
+        socketio.emit('update', {
+            'your_score': your_expected_score,
+            'opponents_score': your_opponent_expected_score,
+            'log': ui_log,
+        }, room=sid, namespace='/')
+
+        socketio.emit('update', {
+            'your_score': opp_expected_score,
+            'opponents_score': opp_opponent_expected_score,
+            'log': ui_log,
+        }, room=opponent_sid, namespace='/')
+
         players[sid]['turn'] = False
         players[opponent_sid]['turn'] = True
         socketio.emit('message', {'msg': 'Waiting for opponent...'}, room=sid, namespace='/')
         socketio.emit('message', {'msg': 'Your turn! Choose a move:'}, room=opponent_sid, namespace='/')
+
 
 def check_round_completion():
     global current_round_index

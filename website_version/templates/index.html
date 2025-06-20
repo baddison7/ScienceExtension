@@ -15,7 +15,7 @@
         #status {
             margin-bottom: 20px;
             font-size: 1.2em;
-            color: #ffcc00;
+            color: #ff9100;
         }
 
         .btn {
@@ -35,7 +35,7 @@
         }
 
         .btn-take {
-            background-color: #e74c3c;
+            background-color: #e9af45;
             color: white;
         }
 
@@ -106,7 +106,7 @@
   });
 
   socket.on('game_over', data => {
-    alert(`${data.msg}\nYour score: ${data.final_score[0]}\nOpponent score: ${data.final_score[1]}`);
+    alert(`${data.msg}\nYour score: ${data.your_score}\nOpponent score: ${data.opponents_score}`);
     setButtonsEnabled(false);
 
   });
@@ -124,7 +124,7 @@
   socket.on('update', data => {
     yourPayoffDiv.textContent = `Your Expected Payoff: ${data.your_score}`;
     opponentPayoffDiv.textContent = `Opponent Expected Payoff: ${data.opponents_score}`;
-    logDiv.textContent + data.log;
+    logDiv.textContent = `Game Log: ${data.log}`;
   });
 </script>
 
